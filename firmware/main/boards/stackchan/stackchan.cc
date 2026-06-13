@@ -60,6 +60,8 @@ static inline bool ServoWritePosOk(int r) { return r > 0; }
 
 #define TAG "StackChanBoard"
 
+LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
+
 class Pmic : public Axp2101 {
 public:
     // Power Init
@@ -4256,7 +4258,7 @@ private:
             return false;
         }
 
-        // Create main face container
+        // Create main face container (Original background color is often white or off-white)
         face_cont_ = lv_obj_create(screen);
         lv_obj_set_size(face_cont_, 320, 240);
         lv_obj_center(face_cont_);
@@ -4265,41 +4267,41 @@ private:
         lv_obj_set_style_border_width(face_cont_, 0, 0);
         lv_obj_clear_flag(face_cont_, LV_OBJ_FLAG_SCROLLABLE);
 
-        // Eyes
+        // Eyes - Original proportions: pos (-70, -16), size 16..32
         eye_l_ = lv_obj_create(face_cont_);
         eye_r_ = lv_obj_create(face_cont_);
-        lv_obj_set_size(eye_l_, 40, 40);
-        lv_obj_set_size(eye_r_, 40, 40);
+        lv_obj_set_size(eye_l_, 24, 24);
+        lv_obj_set_size(eye_r_, 24, 24);
         lv_obj_set_style_radius(eye_l_, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_radius(eye_r_, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_color(eye_l_, lv_color_hex(0x000000), 0);
         lv_obj_set_style_bg_color(eye_r_, lv_color_hex(0x000000), 0);
-        lv_obj_align(eye_l_, LV_ALIGN_CENTER, -60, -20);
-        lv_obj_align(eye_r_, LV_ALIGN_CENTER, 60, -20);
+        lv_obj_align(eye_l_, LV_ALIGN_CENTER, -70, -16);
+        lv_obj_align(eye_r_, LV_ALIGN_CENTER, 70, -16);
 
-        // Mouth
+        // Mouth - Original proportions: pos (0, 26), size (90x6..60x50)
         mouth_ = lv_obj_create(face_cont_);
-        lv_obj_set_size(mouth_, 40, 20);
+        lv_obj_set_size(mouth_, 80, 10);
         lv_obj_set_style_radius(mouth_, 10, 0);
         lv_obj_set_style_bg_color(mouth_, lv_color_hex(0x000000), 0);
-        lv_obj_align(mouth_, LV_ALIGN_CENTER, 0, 50);
+        lv_obj_align(mouth_, LV_ALIGN_CENTER, 0, 26);
 
-        // Blushes (Initially hidden)
+        // Blushes
         blush_l_ = lv_obj_create(face_cont_);
         blush_r_ = lv_obj_create(face_cont_);
-        lv_obj_set_size(blush_l_, 20, 10);
-        lv_obj_set_size(blush_r_, 20, 10);
-        lv_obj_set_style_radius(blush_l_, 5, 0);
-        lv_obj_set_style_radius(blush_r_, 5, 0);
+        lv_obj_set_size(blush_l_, 30, 15);
+        lv_obj_set_size(blush_r_, 30, 15);
+        lv_obj_set_style_radius(blush_l_, 8, 0);
+        lv_obj_set_style_radius(blush_r_, 8, 0);
         lv_obj_set_style_bg_color(blush_l_, lv_color_hex(0xFFB6C1), 0);
         lv_obj_set_style_bg_color(blush_r_, lv_color_hex(0xFFB6C1), 0);
-        lv_obj_align(blush_l_, LV_ALIGN_CENTER, -80, 20);
-        lv_obj_align(blush_r_, LV_ALIGN_CENTER, 80, 20);
+        lv_obj_align(blush_l_, LV_ALIGN_CENTER, -85, 10);
+        lv_obj_align(blush_r_, LV_ALIGN_CENTER, 85, 10);
         lv_obj_add_flag(blush_l_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(blush_r_, LV_OBJ_FLAG_HIDDEN);
 
         lv_obj_move_foreground(face_cont_);
-        ESP_LOGI(TAG, "Vector Avatar created");
+        ESP_LOGI(TAG, "Vector Avatar created with cute proportions");
         return true;
     }
 
@@ -4307,27 +4309,31 @@ private:
         if (!EnsureAvatarObject()) return;
         
         // Reset defaults
-        lv_obj_set_size(eye_l_, 40, 40);
-        lv_obj_set_size(eye_r_, 40, 40);
+        lv_obj_set_size(eye_l_, 24, 24);
+        lv_obj_set_size(eye_r_, 24, 24);
         lv_obj_set_style_radius(eye_l_, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_radius(eye_r_, LV_RADIUS_CIRCLE, 0);
         lv_obj_add_flag(blush_l_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(blush_r_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_bg_color(eye_l_, lv_color_hex(0x000000), 0);
-        lv_obj_set_style_bg_color(eye_r_, lv_color_hex(0x000000), 0);
 
         if (strcmp(face, "happy") == 0) {
             lv_obj_clear_flag(blush_l_, LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(blush_r_, LV_OBJ_FLAG_HIDDEN);
-            // Happy squinty eyes (rectangles)
-            lv_obj_set_size(eye_l_, 40, 15);
-            lv_obj_set_size(eye_r_, 40, 15);
+            // Happy eyes (semi-circles/arch style)
+            lv_obj_set_size(eye_l_, 30, 10);
+            lv_obj_set_size(eye_r_, 30, 10);
             lv_obj_set_style_radius(eye_l_, 5, 0);
             lv_obj_set_style_radius(eye_r_, 5, 0);
         } else if (strcmp(face, "sad") == 0 || strcmp(face, "dizzy") == 0) {
+            lv_obj_set_size(eye_l_, 20, 20);
+            lv_obj_set_size(eye_r_, 20, 20);
             // Low eyes
-            lv_obj_align(eye_l_, LV_ALIGN_CENTER, -60, 0);
-            lv_obj_align(eye_r_, LV_ALIGN_CENTER, 60, 0);
+            lv_obj_align(eye_l_, LV_ALIGN_CENTER, -60, 5);
+            lv_obj_align(eye_r_, LV_ALIGN_CENTER, 60, 5);
+        } else {
+            // Default idle
+            lv_obj_align(eye_l_, LV_ALIGN_CENTER, -70, -16);
+            lv_obj_align(eye_r_, LV_ALIGN_CENTER, 70, -16);
         }
     }
 
@@ -4343,26 +4349,26 @@ private:
         }
 
         if (!speech_bubble_cont_) {
-            // Create bubble as a child of screen, but on top of face
             lv_obj_t* screen = lv_screen_active();
             if (screen == nullptr) return;
 
             speech_bubble_cont_ = lv_obj_create(screen);
             lv_obj_set_size(speech_bubble_cont_, 280, LV_SIZE_CONTENT);
             lv_obj_align(speech_bubble_cont_, LV_ALIGN_TOP_MID, 0, 20);
-            lv_obj_set_style_bg_color(speech_bubble_cont_, lv_color_hex(0x000000), 0); // Black bubble
+            lv_obj_set_style_bg_color(speech_bubble_cont_, lv_color_hex(0x000000), 0);
             lv_obj_set_style_bg_opa(speech_bubble_cont_, 180, 0);
             lv_obj_set_style_radius(speech_bubble_cont_, 20, 0);
             lv_obj_set_style_border_width(speech_bubble_cont_, 2, 0);
-            lv_obj_set_style_border_color(speech_bubble_cont_, lv_color_hex(0xFFFFFF), 0); // White border
-            lv_obj_set_style_pad_all(speech_bubble_cont_, 15, 0);
+            lv_obj_set_style_border_color(speech_bubble_cont_, lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_pad_all(speech_bubble_cont_, 10, 0);
             lv_obj_clear_flag(speech_bubble_cont_, LV_OBJ_FLAG_SCROLLABLE);
 
             speech_bubble_label_ = lv_label_create(speech_bubble_cont_);
-            lv_obj_set_width(speech_bubble_label_, 240);
+            lv_obj_set_width(speech_bubble_label_, 250);
             lv_label_set_long_mode(speech_bubble_label_, LV_LABEL_LONG_WRAP);
-            lv_obj_set_style_text_color(speech_bubble_label_, lv_color_hex(0xFFFFFF), 0); // White text
+            lv_obj_set_style_text_color(speech_bubble_label_, lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_text_align(speech_bubble_label_, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_set_style_text_font(speech_bubble_label_, &BUILTIN_TEXT_FONT, 0);
             lv_obj_align(speech_bubble_label_, LV_ALIGN_CENTER, 0, 0);
         }
 
