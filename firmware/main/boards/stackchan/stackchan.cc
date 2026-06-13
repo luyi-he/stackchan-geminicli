@@ -4270,7 +4270,7 @@ private:
         if (display_ == nullptr) return;
         DisplayLockGuard lock(display_);
 
-        if (text == nullptr || strlen(text) == 0) {
+        if (text == nullptr || text[0] == '\0') {
             if (speech_bubble_cont_) {
                 lv_obj_add_flag(speech_bubble_cont_, LV_OBJ_FLAG_HIDDEN);
             }
