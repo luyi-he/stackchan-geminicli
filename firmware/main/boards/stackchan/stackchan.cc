@@ -534,7 +534,13 @@ private:
     // by Application::Start() -> Display::SetupUI(), which runs after this
     // board's constructor completes. avatar_init_timer_ retries every 500 ms
     // until the screen is ready, then stops itself.
-    lv_obj_t* avatar_img_ = nullptr;
+    lv_obj_t* avatar_img_ = nullptr; // Keep for compatibility if needed
+    lv_obj_t* face_cont_ = nullptr;
+    lv_obj_t* eye_l_ = nullptr;
+    lv_obj_t* eye_r_ = nullptr;
+    lv_obj_t* mouth_ = nullptr;
+    lv_obj_t* blush_l_ = nullptr;
+    lv_obj_t* blush_r_ = nullptr;
     lv_obj_t* speech_bubble_cont_ = nullptr;
     lv_obj_t* speech_bubble_label_ = nullptr;
 
@@ -4242,28 +4248,87 @@ private:
     // Caller must hold the LVGL/display lock. Returns true on success or
     // when avatar_img_ already exists.
     bool EnsureAvatarObject() {
-        if (avatar_img_ != nullptr) {
+        if (face_cont_ != nullptr) {
             return true;
         }
         lv_obj_t* screen = lv_screen_active();
         if (screen == nullptr) {
             return false;
         }
-        avatar_img_ = lv_image_create(screen);
-        if (avatar_img_ == nullptr) {
-            return false;
-        }
-        // Center on the 320x240 LCD and upscale 160x120 -> ~320x240 (2x).
-        // lv_image_set_scale uses 256 = 1.0x; 512 = 2.0x.
-        lv_image_set_scale(avatar_img_, 512);
-        lv_obj_align(avatar_img_, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_clear_flag(avatar_img_, LV_OBJ_FLAG_SCROLLABLE);
-        // Keep the avatar visually on top of the chat UI's emoji_label_,
-        // chat bubbles, etc. The status bar (clock/battery) lives on a
-        // separate sibling and is moved to foreground later if needed.
-        lv_obj_move_foreground(avatar_img_);
-        ESP_LOGI(TAG, "Avatar lv_image created on active screen");
+
+        // Create main face container
+        face_cont_ = lv_obj_create(screen);
+        lv_obj_set_size(face_cont_, 320, 240);
+        lv_obj_center(face_cont_);
+        lv_obj_set_style_bg_color(face_cont_, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_bg_opa(face_cont_, 255, 0);
+        lv_obj_set_style_border_width(face_cont_, 0, 0);
+        lv_obj_clear_flag(face_cont_, LV_OBJ_FLAG_SCROLLABLE);
+
+        // Eyes
+        eye_l_ = lv_obj_create(face_cont_);
+        eye_r_ = lv_obj_create(face_cont_);
+        lv_obj_set_size(eye_l_, 40, 40);
+        lv_obj_set_size(eye_r_, 40, 40);
+        lv_obj_set_style_radius(eye_l_, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_radius(eye_r_, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(eye_l_, lv_color_hex(0x000000), 0);
+        lv_obj_set_style_bg_color(eye_r_, lv_color_hex(0x000000), 0);
+        lv_obj_align(eye_l_, LV_ALIGN_CENTER, -60, -20);
+        lv_obj_align(eye_r_, LV_ALIGN_CENTER, 60, -20);
+
+        // Mouth
+        mouth_ = lv_obj_create(face_cont_);
+        lv_obj_set_size(mouth_, 40, 20);
+        lv_obj_set_style_radius(mouth_, 10, 0);
+        lv_obj_set_style_bg_color(mouth_, lv_color_hex(0x000000), 0);
+        lv_obj_align(mouth_, LV_ALIGN_CENTER, 0, 50);
+
+        // Blushes (Initially hidden)
+        blush_l_ = lv_obj_create(face_cont_);
+        blush_r_ = lv_obj_create(face_cont_);
+        lv_obj_set_size(blush_l_, 20, 10);
+        lv_obj_set_size(blush_r_, 20, 10);
+        lv_obj_set_style_radius(blush_l_, 5, 0);
+        lv_obj_set_style_radius(blush_r_, 5, 0);
+        lv_obj_set_style_bg_color(blush_l_, lv_color_hex(0xFFB6C1), 0);
+        lv_obj_set_style_bg_color(blush_r_, lv_color_hex(0xFFB6C1), 0);
+        lv_obj_align(blush_l_, LV_ALIGN_CENTER, -80, 20);
+        lv_obj_align(blush_r_, LV_ALIGN_CENTER, 80, 20);
+        lv_obj_add_flag(blush_l_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(blush_r_, LV_OBJ_FLAG_HIDDEN);
+
+        lv_obj_move_foreground(face_cont_);
+        ESP_LOGI(TAG, "Vector Avatar created");
         return true;
+    }
+
+    void UpdateVectorFace(const char* face) {
+        if (!EnsureAvatarObject()) return;
+        
+        // Reset defaults
+        lv_obj_set_size(eye_l_, 40, 40);
+        lv_obj_set_size(eye_r_, 40, 40);
+        lv_obj_set_style_radius(eye_l_, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_radius(eye_r_, LV_RADIUS_CIRCLE, 0);
+        lv_obj_add_flag(blush_l_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(blush_r_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_bg_color(eye_l_, lv_color_hex(0x000000), 0);
+        lv_obj_set_style_bg_color(eye_r_, lv_color_hex(0x000000), 0);
+
+        if (strcmp(face, "happy") == 0) {
+            lv_obj_clear_flag(blush_l_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(blush_r_, LV_OBJ_FLAG_HIDDEN);
+            // Happy squinty eyes (rectangles)
+            lv_obj_set_size(eye_l_, 40, 15);
+            lv_obj_set_size(eye_r_, 40, 15);
+            lv_obj_set_style_radius(eye_l_, 5, 0);
+            lv_obj_set_style_radius(eye_r_, 5, 0);
+        } else if (strcmp(face, "sad") == 0 || strcmp(face, "dizzy") == 0) {
+            // Low eyes
+            lv_obj_align(eye_l_, LV_ALIGN_CENTER, -60, 0);
+            lv_obj_align(eye_r_, LV_ALIGN_CENTER, 60, 0);
+        }
     }
 
     void SetSpeechBubble(const char* text) {
@@ -4278,23 +4343,26 @@ private:
         }
 
         if (!speech_bubble_cont_) {
+            // Create bubble as a child of screen, but on top of face
             lv_obj_t* screen = lv_screen_active();
             if (screen == nullptr) return;
 
             speech_bubble_cont_ = lv_obj_create(screen);
             lv_obj_set_size(speech_bubble_cont_, 280, LV_SIZE_CONTENT);
-            lv_obj_align(speech_bubble_cont_, LV_ALIGN_TOP_MID, 0, 10);
-            lv_obj_set_style_bg_color(speech_bubble_cont_, lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_opa(speech_bubble_cont_, 220, 0);
-            lv_obj_set_style_radius(speech_bubble_cont_, 15, 0);
+            lv_obj_align(speech_bubble_cont_, LV_ALIGN_TOP_MID, 0, 20);
+            lv_obj_set_style_bg_color(speech_bubble_cont_, lv_color_hex(0x000000), 0); // Black bubble
+            lv_obj_set_style_bg_opa(speech_bubble_cont_, 180, 0);
+            lv_obj_set_style_radius(speech_bubble_cont_, 20, 0);
             lv_obj_set_style_border_width(speech_bubble_cont_, 2, 0);
-            lv_obj_set_style_border_color(speech_bubble_cont_, lv_color_hex(0x000000), 0);
-            lv_obj_set_style_pad_all(speech_bubble_cont_, 10, 0);
+            lv_obj_set_style_border_color(speech_bubble_cont_, lv_color_hex(0xFFFFFF), 0); // White border
+            lv_obj_set_style_pad_all(speech_bubble_cont_, 15, 0);
+            lv_obj_clear_flag(speech_bubble_cont_, LV_OBJ_FLAG_SCROLLABLE);
 
             speech_bubble_label_ = lv_label_create(speech_bubble_cont_);
-            lv_obj_set_width(speech_bubble_label_, 250);
+            lv_obj_set_width(speech_bubble_label_, 240);
             lv_label_set_long_mode(speech_bubble_label_, LV_LABEL_LONG_WRAP);
-            lv_obj_set_style_text_color(speech_bubble_label_, lv_color_hex(0x000000), 0);
+            lv_obj_set_style_text_color(speech_bubble_label_, lv_color_hex(0xFFFFFF), 0); // White text
+            lv_obj_set_style_text_align(speech_bubble_label_, LV_TEXT_ALIGN_CENTER, 0);
             lv_obj_align(speech_bubble_label_, LV_ALIGN_CENTER, 0, 0);
         }
 
@@ -4306,11 +4374,8 @@ private:
     // Apply the requested face to avatar_img_. Returns false if the face is
     // unknown or the avatar object cannot be created yet.
     bool SetAvatarExpressionLocked(const char* face) {
-        const int idx = FaceNameToIndex(face);
-        if (idx < 0) return false;
-        current_face_index_ = idx;
-        active_layer_ = ActiveLayer::FACE;
-        if (!RenderAvatarLocked()) return false;
+        if (!EnsureAvatarObject()) return false;
+        UpdateVectorFace(face);
         current_avatar_face_ = face;
         return true;
     }
@@ -4447,30 +4512,25 @@ private:
     // be composited in matrix mode and remains the last frame the next
     // mouth call will replace in layered mode.
     bool RestoreCurrentFaceLocked() {
-        current_eyes_index_ = 0;
-        active_layer_ = ActiveLayer::FACE;
-        return RenderAvatarLocked();
+        if (!EnsureAvatarObject()) return false;
+        UpdateVectorFace(current_avatar_face_.c_str());
+        return true;
     }
 
     // Public mouth setter: wraps lock + look-up.
     bool SetMouthShape(const char* shape) {
-        if (display_ == nullptr) {
-            ESP_LOGW(TAG, "SetMouthShape('%s') ignored: display_ not ready", shape);
-            return false;
-        }
-        const int idx = MouthShapeToIndex(shape);
-        if (idx < 0) return false;
-        if (DeferAvatarMouthIfFetching(shape)) {
-            // Fetch in progress — record the request in avatar_pending_ and
-            // let the post-fetch replay path apply it. Matches the face / off
-            // / blink deferral paths so set_mouth doesn't race the AvatarSet
-            // buffer swap.
-            return true;
-        }
+        if (!EnsureAvatarObject()) return false;
         DisplayLockGuard lock(display_);
-        current_mouth_index_ = idx;
-        active_layer_ = ActiveLayer::MOUTH;
-        return RenderAvatarLocked();
+        
+        int h = 20;
+        if (strcmp(shape, "open") == 0) h = 60;
+        else if (strcmp(shape, "half") == 0) h = 40;
+        else if (strcmp(shape, "closed") == 0) h = 10;
+        else if (strcmp(shape, "e") == 0) h = 15;
+        else if (strcmp(shape, "u") == 0) h = 30;
+
+        lv_obj_set_height(mouth_, h);
+        return true;
     }
 
     // Step callback for the four-phase blink sequence. Each invocation
@@ -4489,16 +4549,15 @@ private:
         DisplayLockGuard lock(display_);
         switch (blink_state_) {
             case BlinkState::EYES_HALF_DOWN:
-                current_eyes_index_ = 2;  // closed
-                active_layer_ = ActiveLayer::EYES;
-                RenderAvatarLocked();
+                // In vector mode, we just set the eye size to half or closed
+                lv_obj_set_height(eye_l_, 15);
+                lv_obj_set_height(eye_r_, 15);
                 blink_state_ = BlinkState::EYES_CLOSED;
                 esp_timer_start_once(blink_step_timer_, BLINK_STEP_MS * 1000);
                 break;
             case BlinkState::EYES_CLOSED:
-                current_eyes_index_ = 1;  // half
-                active_layer_ = ActiveLayer::EYES;
-                RenderAvatarLocked();
+                lv_obj_set_height(eye_l_, 2);
+                lv_obj_set_height(eye_r_, 2);
                 blink_state_ = BlinkState::EYES_HALF_UP;
                 esp_timer_start_once(blink_step_timer_, BLINK_STEP_MS * 1000);
                 break;
