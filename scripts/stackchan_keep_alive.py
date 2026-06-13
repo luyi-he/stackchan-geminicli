@@ -11,17 +11,17 @@ PRESETS = {
     "approval": {
         "face": "surprised",
         "pitch": 40,
-        "text": "主人，有任务需要审批。"
+        "text": "Lorrie，有任务需要审批。"
     },
     "done": {
         "face": "happy",
         "pitch": 25,
-        "text": "主人，任务执行完毕，结果已经为您准备好了。"
+        "text": "Lorrie，任务执行完毕，结果已经为您准备好了。"
     },
     "error": {
         "face": "sad",
         "pitch": 10,
-        "text": "哎呀，代码出错了，主人快来看看吧。"
+        "text": "哎呀，代码出错了，Lorrie快来看看吧。"
     }
 }
 
