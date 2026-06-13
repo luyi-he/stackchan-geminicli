@@ -25,6 +25,14 @@ PRESETS = {
     }
 }
 
+async def play_and_clear_speech(gateway, preset):
+    # Set the text bubble
+    await gateway.esp32.call_tool("self.display.set_speech_bubble", {"text": preset["text"]})
+    # Wait for audio to finish playing
+    await synthesize_and_send({"text": preset["text"]}, gateway=gateway)
+    # Clear the text bubble
+    await gateway.esp32.call_tool("self.display.set_speech_bubble", {"text": ""})
+
 async def handle_notify(request):
     try:
         data = await request.json()
@@ -36,8 +44,8 @@ async def handle_notify(request):
             await gateway.esp32.call_tool("self.display.set_avatar", {"face": preset["face"]})
             await gateway.esp32.call_tool("self.robot.set_head_angles", {"yaw": 0, "pitch": preset["pitch"]})
             
-            # Run synthesize_and_send as a background task so it doesn't block the HTTP response
-            asyncio.create_task(synthesize_and_send({"text": preset["text"]}, gateway=gateway))
+            # Run synthesize_and_send and clear bubble as a background task
+            asyncio.create_task(play_and_clear_speech(gateway, preset))
             return web.Response(text="OK")
         return web.Response(text="Unknown preset or device disconnected", status=400)
     except Exception as e:

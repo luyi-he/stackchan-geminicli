@@ -1,0 +1,359 @@
+name: Build
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware-build:
+    name: Firmware build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build firmware with ESP-IDF Docker image
+        working-directory: firmware
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD":/project \
+            -w /project \
+            espressif/idf:v5.5.2 \
+            python ./scripts/release.py stackchan
+
+      - name: Check firmware artifacts
+        run: |
+          set -euo pipefail
+          test -f firmware/build/merged-binary.bin
+          test -f firmware/releases/v2.2.6_stackchan.zip
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: stackchan-firmware-${{ github.sha }}
+          retention-days: 7
+          path: |
+            firmware/build/merged-binary.bin
+            firmware/releases/v2.2.6_stackchan.zip
+
+  firmware-host-test:
+    name: Firmware host test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure firmware host tests
+        run: cmake -S firmware/host_test -B /tmp/firmware-host-test-build
+
+      - name: Build firmware host tests
+        run: cmake --build /tmp/firmware-host-test-build
+
+      - name: Run firmware host tests
+        run: ctest --test-dir /tmp/firmware-host-test-build --output-on-failure
+
+  gateway-test:
+    name: Gateway test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install libopus
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libopus0 libopus-dev
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Install gateway dependencies (with TTS extras)
+        working-directory: gateway
+        run: uv sync --frozen --extra tts
+
+      - name: Run ruff
+        working-directory: gateway
+        run: uv run ruff check .
+
+      - name: Run pytest
+        working-directory: gateway
+        run: uv run pytest
+
+  gateway-windows-smoke:
+    name: Gateway windows-smoke
+    runs-on: windows-latest
+    # Catch regressions in the Windows-only DLL bundling path
+    # (`stackchan_mcp/__init__.py` arch gate + `add_dll_directory` +
+    # PATH update, `pyproject.toml` artifacts list) at PR time rather
+    # than at PyPI publish time. The Ubuntu `gateway-test` job runs
+    # ruff + pytest; this job covers what that one cannot reach
+    # because libopus on Linux ships through `apt`, not the bundled
+    # `opus.dll`.
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Bootstrap vcpkg + install libopus
+        shell: pwsh
+        run: |
+          if (Test-Path "$env:RUNNER_TEMP\vcpkg") {
+            Remove-Item -Recurse -Force "$env:RUNNER_TEMP\vcpkg"
+          }
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP\vcpkg"
+          & "$env:RUNNER_TEMP\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          & "$env:RUNNER_TEMP\vcpkg\vcpkg.exe" install opus:x64-windows
+          $dll = "$env:RUNNER_TEMP\vcpkg\installed\x64-windows\bin\opus.dll"
+          if (-not (Test-Path $dll)) {
+            Write-Error "vcpkg did not produce $dll"
+            exit 1
+          }
+          $dest_dir = "$env:GITHUB_WORKSPACE\gateway\stackchan_mcp\_libs"
+          New-Item -ItemType Directory -Force -Path $dest_dir | Out-Null
+          Copy-Item -Force $dll "$dest_dir\opus.dll"
+          $hash = (Get-FileHash "$dest_dir\opus.dll" -Algorithm SHA256).Hash.ToLower()
+          Write-Output "opus.dll SHA256: $hash"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install gateway with TTS extras from source
+        working-directory: gateway
+        run: uv sync --frozen --extra tts
+
+      - name: Verify bundled DLL is on disk
+        working-directory: gateway
+        shell: pwsh
+        run: |
+          uv run python -c "import stackchan_mcp, pathlib; p = pathlib.Path(stackchan_mcp.__file__).parent / '_libs' / 'opus.dll'; assert p.is_file(), f'missing {p}'; print(f'opus.dll size: {p.stat().st_size}')"
+
+      - name: Verify PATH prepend and add_dll_directory registration
+        working-directory: gateway
+        shell: pwsh
+        run: |
+          uv run python -c "import stackchan_mcp, os, pathlib; libs = str(pathlib.Path(stackchan_mcp.__file__).parent / '_libs'); assert libs in os.environ['PATH'].split(os.pathsep), 'libs/ not in PATH'; assert stackchan_mcp._dll_dir_handle is not None, 'add_dll_directory handle was not retained'; print('PATH and add_dll_directory: OK')"
+
+      - name: Verify find_library + opus encode round-trip
+        working-directory: gateway
+        shell: pwsh
+        run: |
+          uv run python -c "import stackchan_mcp; from ctypes.util import find_library; lib = find_library('opus'); assert lib is not None, 'find_library(opus) returned None'; print(f'find_library opus: {lib}'); import opuslib; enc = opuslib.Encoder(48000, 1, opuslib.APPLICATION_VOIP); _ = enc.encode(b'\x00' * 960 * 2, 960); print('opus encode round-trip: OK')"
+
+  changelog-check:
+    name: CHANGELOG check
+    runs-on: ubuntu-latest
+    # Skip on `release:`-titled PRs: release-promotion PRs move
+    # entries from [Unreleased] into a new dated release section, so
+    # the [Unreleased] body is legitimately unchanged between base
+    # and head when the previous release had already drained it. The
+    # release-time gate in `firmware-release.yml` (and the
+    # `Verify CHANGELOG.md ...` step in `publish.yml`) is the
+    # authoritative check that the promoted section exists for the
+    # tag being pushed.
+    if: github.event_name == 'pull_request' && !startsWith(github.event.pull_request.title, 'release:')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify [Unreleased] subsection entry for each touched component
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # List paths changed between the PR base and head.
+          CHANGED=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          echo "Changed files between $BASE_SHA and $HEAD_SHA:"
+          printf '%s\n' "$CHANGED"
+          echo "---"
+
+          firmware_touched=0
+          gateway_touched=0
+
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              # Machine-generated lockfile sync — does not require a
+              # CHANGELOG entry on its own. If a PR is purely a lockfile
+              # bump and nothing else under firmware/ or gateway/ changes,
+              # this check passes.
+              gateway/uv.lock | gateway/poetry.lock)
+                continue
+                ;;
+              firmware/*)
+                firmware_touched=1
+                ;;
+              gateway/*)
+                gateway_touched=1
+                ;;
+            esac
+          done <<EOF
+          $CHANGED
+          EOF
+
+          if [ "$firmware_touched" -eq 0 ] && [ "$gateway_touched" -eq 0 ]; then
+            echo "No firmware/ or gateway/ source changes detected; CHANGELOG check skipped."
+            exit 0
+          fi
+
+          # Verify the [Unreleased] section gained content via Python
+          # (portable parsing logic, identical between CI and local).
+          #
+          # Mission: catch the common miss case — a source-touching PR
+          # that forgets to add a CHANGELOG entry. This is the floor;
+          # finer judgement on the content of the entries belongs to
+          # maintainer review of the diff at merge time, and to the
+          # release-time gate in `firmware-release.yml` at promotion
+          # time.
+          #
+          # NOT in scope (intentionally hands off to maintainer review):
+          #   - Cross-subsection bullet moves
+          #   - Wholesale restructuring (deletions, replacements,
+          #     consolidating duplicates)
+          #   - Typo-polish that incidentally changes [Unreleased]
+          #
+          # Rationale: this repository's priority is to welcome
+          # contributors and LLM users. CI should keep the floor
+          # honest (entry present, structure sound) without micromanaging
+          # CHANGELOG diff shape — over-strict CI blocks legitimate
+          # contributor workflows (mixing a new entry with a small
+          # polish, consolidating duplicates) for no end-user benefit.
+          BASE_TEXT="$(git show "$BASE_SHA:CHANGELOG.md")" \
+          HEAD_TEXT="$(git show "$HEAD_SHA:CHANGELOG.md")" \
+          python3 - <<'PY'
+          import os
+          import sys
+
+          base_text = os.environ["BASE_TEXT"]
+          head_text = os.environ["HEAD_TEXT"]
+
+          UNRELEASED_HEADING = "## [Unreleased]"
+
+
+          def extract_unreleased_body(text: str) -> str:
+              """Return the body of the first [Unreleased] section,
+              starting right after the heading and ending just before
+              the next '## ' heading. Leading/trailing whitespace is
+              stripped so cosmetic blank-line-only diffs do not pass."""
+              lines = []
+              in_section = False
+              for line in text.split("\n"):
+                  if line == UNRELEASED_HEADING:
+                      in_section = True
+                      continue
+                  if in_section and line.startswith("## "):
+                      break
+                  if in_section:
+                      lines.append(line)
+              return "\n".join(lines).strip()
+
+
+          def validate_structure(text: str):
+              """Return None if valid, otherwise an error string.
+
+              Enforces:
+                1. Exactly one '## [Unreleased]' heading
+                2. The [Unreleased] heading appears before the first
+                   dated release heading (e.g.
+                   '## [1.0.0] - 2025-01-01' or
+                   '## [firmware-v1.8.0] - 2026-05-20')
+
+              Both invariants matter because release-prep tooling
+              (`firmware-release.yml` sed extraction, the
+              CONTRIBUTING.md promotion flow) operates on the active
+              top [Unreleased] section.
+              """
+              lines = text.split("\n")
+              unreleased_idx = None
+              first_dated_idx = None
+              for i, line in enumerate(lines):
+                  if line == UNRELEASED_HEADING:
+                      if unreleased_idx is not None:
+                          return (
+                              "duplicate '## [Unreleased]' heading "
+                              f"(at lines {unreleased_idx + 1} and "
+                              f"{i + 1})"
+                          )
+                      unreleased_idx = i
+                  elif line.startswith("## ") and " - " in line:
+                      if first_dated_idx is None:
+                          first_dated_idx = i
+              if unreleased_idx is None:
+                  return "no '## [Unreleased]' heading found"
+              if (
+                  first_dated_idx is not None
+                  and unreleased_idx > first_dated_idx
+              ):
+                  return (
+                      "'## [Unreleased]' heading must appear before "
+                      "the first dated release heading "
+                      f"(at line {unreleased_idx + 1}, after a dated "
+                      f"release at line {first_dated_idx + 1})"
+                  )
+              return None
+
+          head_err = validate_structure(head_text)
+          if head_err:
+              print(
+                  "::error title=Invalid CHANGELOG.md structure (HEAD)::"
+                  f"{head_err}. The gate cannot validate per-PR entries "
+                  "against a malformed [Unreleased] section; fix the "
+                  "structure before merging."
+              )
+              sys.exit(1)
+
+          base_body = extract_unreleased_body(base_text)
+          head_body = extract_unreleased_body(head_text)
+
+          if base_body == head_body:
+              print(
+                  "::error title=Missing [Unreleased] entry::"
+                  "Source changes detected under firmware/ or gateway/, "
+                  "but the [Unreleased] section of CHANGELOG.md is "
+                  "unchanged between base and head."
+              )
+              print()
+              print(
+                  "Add an entry under the matching subsection of "
+                  "[Unreleased] before merging:"
+              )
+              print("  * [Unreleased] > ### Firmware  for firmware/ changes")
+              print("  * [Unreleased] > ### Gateway   for gateway/ changes")
+              print()
+              print(
+                  "Touching CHANGELOG.md outside [Unreleased] (e.g. a "
+                  "typo fix on an older release section) does not "
+                  "satisfy this gate. See CONTRIBUTING.md > 'Changelog "
+                  "entries per PR' for the auto-skip list and the "
+                  "relationship to the release-time gate in "
+                  "firmware-release.yml."
+              )
+              sys.exit(1)
+
+          print("CHANGELOG check passed ([Unreleased] body changed).")
+          PY
