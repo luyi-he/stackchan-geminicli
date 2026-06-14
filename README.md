@@ -27,12 +27,29 @@ Stack-chan 默认固件为了省电，在没有持续交互时会自动进入休
 
 1.  将 Stack-chan 通过 USB 连接到电脑。
 2.  进入 `firmware/` 目录。
-3.  运行以下命令进行烧录（需安装 `esptool`）：
-    ```bash
-    pip install esptool
-    python -m esptool --chip esp32s3 --port COM3 -b 460800 write_flash 0x0 merged-binary.bin
-    ```
-    *(请根据实际情况修改 `--port`)*
+3.  **⚠️ 重要：备份与烧录安全注意事项**
+    全量烧录 `merged-binary.bin` 到 `0x0` 会**覆盖** WiFi 配置（NVS 分区）和人脸包/皮肤（Assets 分区）。为避免数据丢失，请务必执行以下安全烧录流程：
+    *   **NVS 分区 (WiFi 配置)**：位于 `0x9000`，大小 16KB (`0x4000`)。
+    *   **Assets 分区 (人脸包/皮肤)**：位于 `0x800000`，大小 8MB (`0x800000`)。
+
+    **安全烧录流程（以 COM3 为例，请按实际修改 `--port`）：**
+    *   **步骤 A (备份)**：
+        ```bash
+        python -m esptool --port COM3 read_flash 0x9000 0x4000 nvs_backup.bin
+        python -m esptool --port COM3 read_flash 0x800000 0x800000 assets_backup.bin
+        ```
+    *   **步骤 B (烧录固件)**：
+        ```bash
+        python -m esptool --chip esp32s3 --port COM3 -b 460800 write_flash 0x0 merged-binary.bin
+        ```
+    *   **步骤 C (恢复备份)**：
+        ```bash
+        python -m esptool --port COM3 --baud 921600 write_flash 0x9000 nvs_backup.bin
+        python -m esptool --port COM3 --baud 921600 write_flash 0x800000 assets_backup.bin
+        ```
+
+    *(注：如果仅是日常迭代更新应用层，请尽量只烧录 `xiaozhi.bin` 到 `0x20000`，这样不会影响 NVS 和 Assets：`esptool.py --chip esp32s3 --port COM3 -b 460800 write_flash 0x20000 build/xiaozhi.bin`)*
+
 
 4.  烧录完成后，机器人会显示 WiFi 配置界面。连接机器人的热点，在网页中配置：
     *   **WiFi**: 你的局域网信息。

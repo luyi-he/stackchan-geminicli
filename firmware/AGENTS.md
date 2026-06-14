@@ -82,12 +82,29 @@ docker run --rm --cpus=4 --ulimit nofile=65536:65536 \
 **Flash `xiaozhi.bin` to `0x20000` to preserve NVS**:
 
 ```bash
-esptool.py --chip esp32s3 --port /dev/cu.usbmodemXXXX -b 460800 \
+esptool.py --chip esp32s3 --port COM3 -b 460800 \
   --before default_reset --after hard_reset \
   write_flash 0x20000 build/xiaozhi.bin
 ```
 
-**Do NOT flash `merged-binary.bin` to `0x0` in routine work** — this overwrites bootloader through partition table and risks NVS data loss.
+⚠️ **CRITICAL WARNING FOR FULL FLASHING (merged-binary.bin to 0x0)**:
+Full flashing to `0x0` overwrites NVS (WiFi config) and Assets (face packs). You MUST backup and restore these partitions if you perform a full flash:
+*   **NVS Partition** (WiFi Config): offset `0x9000`, size 16KB (`0x4000`)
+*   **Assets Partition** (Face/Skin Pack): offset `0x800000`, size 8MB (`0x800000`)
+
+**Safe Full-Flashing Procedure**:
+1. **Backup**:
+   ```bash
+   python -m esptool --port COM3 read_flash 0x9000 0x4000 nvs_backup.bin
+   python -m esptool --port COM3 read_flash 0x800000 0x800000 assets_backup.bin
+   ```
+2. **Flash firmware**: Flash your merged binary to `0x0`.
+3. **Restore**:
+   ```bash
+   python -m esptool --port COM3 --baud 921600 write_flash 0x9000 nvs_backup.bin
+   python -m esptool --port COM3 --baud 921600 write_flash 0x800000 assets_backup.bin
+   ```
+
 
 ### Serial monitor (post-flash)
 

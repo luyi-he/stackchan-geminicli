@@ -32,22 +32,51 @@ async def play_and_clear_speech(gateway, preset):
     await synthesize_and_send({"text": preset["text"]}, gateway=gateway)
     # Clear the text bubble
     await gateway.esp32.call_tool("self.display.set_speech_bubble", {"text": ""})
+    # Reset face to idle and mouth to closed
+    await gateway.esp32.call_tool("self.display.set_avatar", {"face": "idle"})
+    await gateway.esp32.call_tool("self.display.set_mouth", {"mouth": "closed"})
+    # Reset head posture to straight ahead (looking up)
+    await gateway.esp32.call_tool("self.robot.set_head_angles", {"yaw": 0, "pitch": 40})
 
 async def handle_notify(request):
     try:
         data = await request.json()
-        preset_name = data.get("preset")
         gateway = request.app["gateway"]
         
-        if preset_name in PRESETS and gateway.esp32.device_connected:
+        # Determine settings from preset or direct input
+        preset_name = data.get("preset")
+        if preset_name == "reset":
+            if gateway.esp32.device_connected:
+                await gateway.esp32.call_tool("self.display.set_avatar", {"face": "idle"})
+                await gateway.esp32.call_tool("self.display.set_mouth", {"mouth": "closed"})
+                await gateway.esp32.call_tool("self.display.set_speech_bubble", {"text": ""})
+                return web.Response(text="OK")
+            return web.Response(text="Device disconnected", status=400)
+
+        if preset_name == "reboot":
+            if gateway.esp32.device_connected:
+                await gateway.esp32.call_tool("self.reboot", {})
+                return web.Response(text="Rebooting")
+            return web.Response(text="Device disconnected", status=400)
+
+        if preset_name and preset_name in PRESETS:
             preset = PRESETS[preset_name]
-            await gateway.esp32.call_tool("self.display.set_avatar", {"face": preset["face"]})
-            await gateway.esp32.call_tool("self.robot.set_head_angles", {"yaw": 0, "pitch": preset["pitch"]})
-            
+            text = preset["text"]
+            face = preset["face"]
+            pitch = preset["pitch"]
+        else:
+            text = data.get("text", "你好，Lorrie。")
+            face = data.get("face", "happy")
+            pitch = data.get("pitch", 25)
+
+        if gateway.esp32.device_connected:
+            await gateway.esp32.call_tool("self.display.set_avatar", {"face": face})
+            await gateway.esp32.call_tool("self.robot.set_head_angles", {"yaw": 0, "pitch": pitch})
+
             # Run synthesize_and_send and clear bubble as a background task
-            asyncio.create_task(play_and_clear_speech(gateway, preset))
+            asyncio.create_task(play_and_clear_speech(gateway, {"text": text}))
             return web.Response(text="OK")
-        return web.Response(text="Unknown preset or device disconnected", status=400)
+        return web.Response(text="Device disconnected", status=400)
     except Exception as e:
         return web.Response(text=str(e), status=500)
 

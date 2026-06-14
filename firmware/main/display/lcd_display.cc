@@ -573,6 +573,7 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
 
     // Create the message text
     lv_obj_t* msg_text = lv_label_create(msg_bubble);
+    lv_obj_set_style_text_font(msg_text, lvgl_theme->text_font()->font(), 0);
     lv_label_set_text(msg_text, content);
     
     // Calculate bubble width constraints
@@ -940,6 +941,7 @@ void LcdDisplay::SetupUI() {
 
     /* chat_message_label_ placed in bottom_bar_, multiline wrapped display */
     chat_message_label_ = lv_label_create(bottom_bar_);
+    lv_obj_set_style_text_font(chat_message_label_, text_font, 0);
     lv_label_set_text(chat_message_label_, "");
     lv_obj_set_width(chat_message_label_, LV_HOR_RES - lvgl_theme->spacing(8));
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP);
@@ -963,6 +965,7 @@ void LcdDisplay::SetupUI() {
 
     /* chat_message_label_ placed in bottom_bar_, single-line horizontal scroll */
     chat_message_label_ = lv_label_create(bottom_bar_);
+    lv_obj_set_style_text_font(chat_message_label_, text_font, 0);
     lv_label_set_text(chat_message_label_, "");
     lv_obj_set_width(chat_message_label_, LV_HOR_RES - lvgl_theme->spacing(8));
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
@@ -1192,7 +1195,9 @@ void LcdDisplay::SetTheme(Theme* theme) {
     
     // Update status bar elements
     lv_obj_set_style_text_color(network_label_, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_text_font(status_label_, text_font, 0);
     lv_obj_set_style_text_color(status_label_, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_text_font(notification_label_, text_font, 0);
     lv_obj_set_style_text_color(notification_label_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_text_color(mute_label_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
@@ -1261,6 +1266,7 @@ void LcdDisplay::SetTheme(Theme* theme) {
                     } else {
                         lv_obj_set_style_text_color(text, lvgl_theme->text_color(), 0);
                     }
+                    lv_obj_set_style_text_font(text, text_font, 0);
                 }
             }
         } else {
@@ -1270,6 +1276,7 @@ void LcdDisplay::SetTheme(Theme* theme) {
 #else
     // Simple UI mode - just update the main chat message
     if (chat_message_label_ != nullptr) {
+        lv_obj_set_style_text_font(chat_message_label_, text_font, 0);
         lv_obj_set_style_text_color(chat_message_label_, lvgl_theme->text_color(), 0);
     }
     
