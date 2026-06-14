@@ -48,6 +48,11 @@ static inline bool ServoWritePosOk(int r) { return r > 0; }
 #include <freertos/semphr.h>
 #include "esp_video.h"
 #include <cJSON.h>
+#include "stackchan.h"
+#include "avatar/skins/default/default.h"
+#include "modifiers/blink.h"
+#include "modifiers/breath.h"
+
 #include <lvgl.h>
 #include <algorithm>
 #include <atomic>
@@ -536,14 +541,10 @@ private:
     // by Application::Start() -> Display::SetupUI(), which runs after this
     // board's constructor completes. avatar_init_timer_ retries every 500 ms
     // until the screen is ready, then stops itself.
-    lv_obj_t* face_cont_ = nullptr;
-    lv_obj_t* eye_l_ = nullptr;
-    lv_obj_t* eye_r_ = nullptr;
-    lv_obj_t* mouth_ = nullptr;
-    lv_obj_t* blush_l_ = nullptr;
-    lv_obj_t* blush_r_ = nullptr;
-    lv_obj_t* speech_bubble_cont_ = nullptr;
-    lv_obj_t* speech_bubble_label_ = nullptr;
+    // ---- Original StackChan Logic Integration ----
+    stackchan::StackChan stack_chan_;
+    lv_obj_t* speech_bubble_cont_ = nullptr; // keep for text updates
+    lv_obj_t* speech_bubble_label_ = nullptr; // keep for text updates
 
     esp_timer_handle_t avatar_init_timer_ = nullptr;
     std::string current_avatar_face_ = "idle";
@@ -4237,141 +4238,56 @@ private:
             return false;
         }
 
-        if (face_cont_ != nullptr) {
+        if (stack_chan_.hasAvatar()) {
             // If the active screen has changed, move the avatar to the new screen
-            if (lv_obj_get_parent(face_cont_) != screen) {
-                lv_obj_set_parent(face_cont_, screen);
-                if (speech_bubble_cont_) {
-                    lv_obj_set_parent(speech_bubble_cont_, screen);
-                }
+            lv_obj_t* panel = stack_chan_.avatar().getPanel()->get();
+            if (lv_obj_get_parent(panel) != screen) {
+                lv_obj_set_parent(panel, screen);
+                // The speech bubble is part of the original avatar class now, 
+                // but we might still need to handle it if we used our custom one.
+                // Original DefaultAvatar already has its own speech bubble!
             }
             return true;
         }
 
-        // Create main face container (Original background color is often white or off-white)
-        face_cont_ = lv_obj_create(screen);
-        lv_obj_set_size(face_cont_, 320, 240);
-        lv_obj_center(face_cont_);
-        lv_obj_set_style_bg_color(face_cont_, lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_style_bg_opa(face_cont_, 255, 0);
-        lv_obj_set_style_border_width(face_cont_, 0, 0);
-        lv_obj_clear_flag(face_cont_, LV_OBJ_FLAG_SCROLLABLE);
+        // Initialize original StackChan Avatar
+        auto avatar = std::make_unique<stackchan::avatar::DefaultAvatar>();
+        avatar->init(screen);
+        stack_chan_.attachAvatar(std::move(avatar));
 
-        // Eyes - Original proportions: pos (-70, -16), size 16..32
-        eye_l_ = lv_obj_create(face_cont_);
-        eye_r_ = lv_obj_create(face_cont_);
-        lv_obj_set_size(eye_l_, 24, 24);
-        lv_obj_set_size(eye_r_, 24, 24);
-        lv_obj_set_style_radius(eye_l_, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_radius(eye_r_, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(eye_l_, lv_color_hex(0x000000), 0);
-        lv_obj_set_style_bg_color(eye_r_, lv_color_hex(0x000000), 0);
-        lv_obj_align(eye_l_, LV_ALIGN_CENTER, -70, -16);
-        lv_obj_align(eye_r_, LV_ALIGN_CENTER, 70, -16);
+        // Add standard modifiers (Blink, Breath)
+        stack_chan_.addModifier(std::make_unique<stackchan::BlinkModifier>());
+        stack_chan_.addModifier(std::make_unique<stackchan::BreathModifier>());
 
-        // Mouth - Original proportions: pos (0, 26), size (90x6..60x50)
-        mouth_ = lv_obj_create(face_cont_);
-        lv_obj_set_size(mouth_, 80, 10);
-        lv_obj_set_style_radius(mouth_, 10, 0);
-        lv_obj_set_style_bg_color(mouth_, lv_color_hex(0x000000), 0);
-        lv_obj_align(mouth_, LV_ALIGN_CENTER, 0, 26);
-
-        // Blushes
-        blush_l_ = lv_obj_create(face_cont_);
-        blush_r_ = lv_obj_create(face_cont_);
-        lv_obj_set_size(blush_l_, 30, 15);
-        lv_obj_set_size(blush_r_, 30, 15);
-        lv_obj_set_style_radius(blush_l_, 8, 0);
-        lv_obj_set_style_radius(blush_r_, 8, 0);
-        lv_obj_set_style_bg_color(blush_l_, lv_color_hex(0xFFB6C1), 0);
-        lv_obj_set_style_bg_color(blush_r_, lv_color_hex(0xFFB6C1), 0);
-        lv_obj_align(blush_l_, LV_ALIGN_CENTER, -85, 10);
-        lv_obj_align(blush_r_, LV_ALIGN_CENTER, 85, 10);
-        lv_obj_add_flag(blush_l_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(blush_r_, LV_OBJ_FLAG_HIDDEN);
-
-        lv_obj_move_foreground(face_cont_);
-        ESP_LOGI(TAG, "Vector Avatar created with cute proportions");
+        ESP_LOGI(TAG, "Original StackChan Avatar and Modifiers initialized");
         return true;
     }
 
-    void UpdateVectorFace(const char* face) {
-        if (!EnsureAvatarObject()) return;
-        
-        // Reset defaults
-        lv_obj_set_size(eye_l_, 24, 24);
-        lv_obj_set_size(eye_r_, 24, 24);
-        lv_obj_set_style_radius(eye_l_, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_radius(eye_r_, LV_RADIUS_CIRCLE, 0);
-        lv_obj_add_flag(blush_l_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(blush_r_, LV_OBJ_FLAG_HIDDEN);
-
-        if (strcmp(face, "happy") == 0) {
-            lv_obj_clear_flag(blush_l_, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(blush_r_, LV_OBJ_FLAG_HIDDEN);
-            // Happy eyes (semi-circles/arch style)
-            lv_obj_set_size(eye_l_, 30, 10);
-            lv_obj_set_size(eye_r_, 30, 10);
-            lv_obj_set_style_radius(eye_l_, 5, 0);
-            lv_obj_set_style_radius(eye_r_, 5, 0);
-        } else if (strcmp(face, "sad") == 0 || strcmp(face, "dizzy") == 0) {
-            lv_obj_set_size(eye_l_, 20, 20);
-            lv_obj_set_size(eye_r_, 20, 20);
-            // Low eyes
-            lv_obj_align(eye_l_, LV_ALIGN_CENTER, -60, 5);
-            lv_obj_align(eye_r_, LV_ALIGN_CENTER, 60, 5);
-        } else {
-            // Default idle
-            lv_obj_align(eye_l_, LV_ALIGN_CENTER, -70, -16);
-            lv_obj_align(eye_r_, LV_ALIGN_CENTER, 70, -16);
-        }
-    }
-
     void SetSpeechBubble(const char* text) {
-        if (display_ == nullptr) return;
+        if (!EnsureAvatarObject()) return;
         DisplayLockGuard lock(display_);
 
         if (text == nullptr || text[0] == '\0') {
-            if (speech_bubble_cont_) {
-                lv_obj_add_flag(speech_bubble_cont_, LV_OBJ_FLAG_HIDDEN);
-            }
+            stack_chan_.avatar().getSpeechBubble()->clearSpeech();
             return;
         }
 
-        if (!speech_bubble_cont_) {
-            lv_obj_t* screen = lv_screen_active();
-            if (screen == nullptr) return;
-
-            speech_bubble_cont_ = lv_obj_create(screen);
-            lv_obj_set_size(speech_bubble_cont_, 280, LV_SIZE_CONTENT);
-            lv_obj_align(speech_bubble_cont_, LV_ALIGN_TOP_MID, 0, 20);
-            lv_obj_set_style_bg_color(speech_bubble_cont_, lv_color_hex(0x000000), 0);
-            lv_obj_set_style_bg_opa(speech_bubble_cont_, 180, 0);
-            lv_obj_set_style_radius(speech_bubble_cont_, 20, 0);
-            lv_obj_set_style_border_width(speech_bubble_cont_, 2, 0);
-            lv_obj_set_style_border_color(speech_bubble_cont_, lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_pad_all(speech_bubble_cont_, 10, 0);
-            lv_obj_clear_flag(speech_bubble_cont_, LV_OBJ_FLAG_SCROLLABLE);
-
-            speech_bubble_label_ = lv_label_create(speech_bubble_cont_);
-            lv_obj_set_width(speech_bubble_label_, 250);
-            lv_label_set_long_mode(speech_bubble_label_, LV_LABEL_LONG_WRAP);
-            lv_obj_set_style_text_color(speech_bubble_label_, lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_text_align(speech_bubble_label_, LV_TEXT_ALIGN_CENTER, 0);
-            lv_obj_set_style_text_font(speech_bubble_label_, &BUILTIN_TEXT_FONT, 0);
-            lv_obj_align(speech_bubble_label_, LV_ALIGN_CENTER, 0, 0);
-        }
-
-        lv_label_set_text(speech_bubble_label_, text);
-        lv_obj_clear_flag(speech_bubble_cont_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_move_foreground(speech_bubble_cont_);
+        stack_chan_.avatar().getSpeechBubble()->setSpeech(text);
     }
 
     // Apply the requested face to avatar_img_. Returns false if the face is
     // unknown or the avatar object cannot be created yet.
     bool SetAvatarExpressionLocked(const char* face) {
         if (!EnsureAvatarObject()) return false;
-        UpdateVectorFace(face);
+        
+        stackchan::avatar::Emotion emotion = stackchan::avatar::Emotion::Neutral;
+        if (strcmp(face, "happy") == 0) emotion = stackchan::avatar::Emotion::Happy;
+        else if (strcmp(face, "sad") == 0) emotion = stackchan::avatar::Emotion::Sad;
+        else if (strcmp(face, "angry") == 0) emotion = stackchan::avatar::Emotion::Angry;
+        else if (strcmp(face, "doubt") == 0) emotion = stackchan::avatar::Emotion::Doubt;
+        else if (strcmp(face, "sleepy") == 0) emotion = stackchan::avatar::Emotion::Sleepy;
+
+        stack_chan_.avatar().setEmotion(emotion);
         current_avatar_face_ = face;
         return true;
     }
@@ -4498,6 +4414,23 @@ private:
         ESP_ERROR_CHECK(esp_timer_start_periodic(avatar_init_timer_, 500 * 1000));
     }
 
+    static void AvatarTaskTrampoline(void* arg) {
+        StackChanBoard* self = static_cast<StackChanBoard*>(arg);
+        self->AvatarTask();
+    }
+
+    void AvatarTask() {
+        while (true) {
+            {
+                DisplayLockGuard lock(display_);
+                if (stack_chan_.hasAvatar()) {
+                    stack_chan_.update();
+                }
+            }
+            vTaskDelay(pdMS_TO_TICKS(33)); // ~30 FPS
+        }
+    }
+
     // ---- Phase 2: parts (eyes / mouth) and blink state machine ----------
     //
     // Eye and mouth axes share the unified rendering state machine above —
@@ -4523,14 +4456,14 @@ private:
         if (!EnsureAvatarObject()) return false;
         DisplayLockGuard lock(display_);
         
-        int h = 20;
-        if (strcmp(shape, "open") == 0) h = 60;
-        else if (strcmp(shape, "half") == 0) h = 40;
-        else if (strcmp(shape, "closed") == 0) h = 10;
-        else if (strcmp(shape, "e") == 0) h = 15;
-        else if (strcmp(shape, "u") == 0) h = 30;
+        int weight = 0;
+        if (strcmp(shape, "open") == 0) weight = 100;
+        else if (strcmp(shape, "half") == 0) weight = 50;
+        else if (strcmp(shape, "closed") == 0) weight = 0;
+        else if (strcmp(shape, "e") == 0) weight = 30;
+        else if (strcmp(shape, "u") == 0) weight = 60;
 
-        lv_obj_set_height(mouth_, h);
+        stack_chan_.avatar().getMouth()->setWeight(weight);
         return true;
     }
 
@@ -4538,44 +4471,11 @@ private:
     // advances blink_state_, applies the corresponding image, and re-arms
     // blink_step_timer_ unless we're returning to the resting face.
     static void BlinkStepCb(void* arg) {
-        StackChanBoard* self = static_cast<StackChanBoard*>(arg);
-        self->BlinkStepAdvance();
+        // Obsolete: BlinkModifier now handles this.
     }
 
     void BlinkStepAdvance() {
-        if (display_ == nullptr) {
-            blink_state_ = BlinkState::IDLE;
-            return;
-        }
-        DisplayLockGuard lock(display_);
-        switch (blink_state_) {
-            case BlinkState::EYES_HALF_DOWN:
-                // In vector mode, we just set the eye size to half or closed
-                lv_obj_set_height(eye_l_, 15);
-                lv_obj_set_height(eye_r_, 15);
-                blink_state_ = BlinkState::EYES_CLOSED;
-                esp_timer_start_once(blink_step_timer_, BLINK_STEP_MS * 1000);
-                break;
-            case BlinkState::EYES_CLOSED:
-                lv_obj_set_height(eye_l_, 2);
-                lv_obj_set_height(eye_r_, 2);
-                blink_state_ = BlinkState::EYES_HALF_UP;
-                esp_timer_start_once(blink_step_timer_, BLINK_STEP_MS * 1000);
-                break;
-            case BlinkState::EYES_HALF_UP:
-                // Final: restore the resting state. In layered mode this
-                // repaints the face image (the Phase 2 trade-off: any
-                // active mouth overlay is replaced by the face). In matrix
-                // mode the mouth index is preserved so the composite frame
-                // keeps the user's lip-sync state.
-                RestoreCurrentFaceLocked();
-                blink_state_ = BlinkState::IDLE;
-                break;
-            case BlinkState::IDLE:
-            default:
-                // Stale callback; nothing to do.
-                break;
-        }
+        // Obsolete: BlinkModifier now handles this.
     }
 
     // Schedule callback: fires roughly every BLINK_MIN_GAP_MS..BLINK_MAX_GAP_MS.
@@ -6620,6 +6520,7 @@ public:
         // Avatar is shown on-demand via MCP set_avatar command.
         // InitializeAvatar();
         InitializeMouthSequenceTask();
+        xTaskCreate(&StackChanBoard::AvatarTaskTrampoline, "avatar_update", 4096, this, tskIDLE_PRIORITY + 1, nullptr);
         RegisterMcpTools();
     }
 

@@ -40,7 +40,17 @@ set(SOURCES "audio/audio_codec.cc"
             "main.cc"
             )
 
-set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "audio/demuxer" "protocols")
+set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "audio/demuxer" "protocols"
+                "boards/stackchan/original_avatar_logic"
+                "boards/stackchan/original_avatar_logic/avatar"
+                "boards/stackchan/original_avatar_logic/avatar/avatar"
+                "boards/stackchan/original_avatar_logic/avatar/skins/default")
+
+file(GLOB_RECURSE ORIGINAL_LOGIC_SOURCES
+    "boards/stackchan/original_avatar_logic/*.c"
+    "boards/stackchan/original_avatar_logic/*.cc"
+    "boards/stackchan/original_avatar_logic/*.cpp"
+)
 
 # Add board common files
 list(APPEND SOURCES
@@ -61,6 +71,7 @@ list(APPEND SOURCES
     "boards/common/sleep_timer.cc"
     "boards/common/sy6970.cc"
     "boards/common/system_reset.cc"
+    ${ORIGINAL_LOGIC_SOURCES}
 )
 list(APPEND INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards/common)
 
