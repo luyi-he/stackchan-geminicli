@@ -45,7 +45,13 @@ set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg"
                 "boards/stackchan/original_avatar_logic/hal"
                 "boards/stackchan/original_avatar_logic/avatar"
                 "boards/stackchan/original_avatar_logic/avatar/avatar"
-                "boards/stackchan/original_avatar_logic/avatar/skins/default")
+                "boards/stackchan/original_avatar_logic/avatar/skins/default"
+                "boards/stackchan/original_avatar_logic/animation"
+                "boards/stackchan/original_avatar_logic/addons/neon_light"
+                "boards/stackchan/original_avatar_logic/json"
+                "boards/stackchan/original_avatar_logic/modifiers"
+                "boards/stackchan/original_avatar_logic/motion"
+                "boards/stackchan/original_avatar_logic/utils")
 
 file(GLOB_RECURSE ORIGINAL_LOGIC_SOURCES
     "boards/stackchan/original_avatar_logic/*.c"
