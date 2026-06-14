@@ -11,6 +11,10 @@
 #include <smooth_lvgl.hpp>
 #include <vector>
 
+namespace smooth_ui_toolkit {
+}
+namespace uitk = smooth_ui_toolkit;
+
 namespace app_center {
     struct AppInfo_t {
         std::string name;
@@ -28,12 +32,12 @@ public:
     void lvglUnlock() {}
 
     // Missing RGB methods
-    void setRgbColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {}
+    void setRgbColor(std::uint8_t index, std::uint8_t r, std::uint8_t g, std::uint8_t b) {}
     void refreshRgb() {}
 
-    // Missing Signals
-    uitk::Signal<HeadPetGesture> onHeadPetGesture;
-    uitk::Signal<ImuMotionEvent> onImuMotionEvent;
+    // Missing Signals - Use explicit namespace
+    smooth_ui_toolkit::Signal<HeadPetGesture> onHeadPetGesture;
+    smooth_ui_toolkit::Signal<ImuMotionEvent> onImuMotionEvent;
 };
 
 Hal& GetHAL();
