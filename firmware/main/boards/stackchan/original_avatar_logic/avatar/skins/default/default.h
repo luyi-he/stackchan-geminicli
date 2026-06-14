@@ -8,6 +8,7 @@
 #include "../../avatar/elements/feature.h"
 #include <lvgl.h>
 #include <smooth_lvgl.hpp>
+#include <uitk/short_namespace.hpp>
 #include <memory>
 
 namespace stackchan::avatar {
