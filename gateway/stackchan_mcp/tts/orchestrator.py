@@ -339,6 +339,7 @@ async def synthesize_and_send(
     result = await send_pcm_audio(
         gateway,
         pcm,
+        text=tts_text,
         source_label=f"engine:{voice}",
         before_first_frame=(
             dispatch_face_before_first_frame if face is not None else None
@@ -376,6 +377,7 @@ async def send_pcm_audio(
     gateway: "Gateway",
     pcm: bytes,
     *,
+    text: str | None = None,
     source_rate: int = DEVICE_SAMPLE_RATE,
     source_label: str = "external",
     before_first_frame: Callable[[], Awaitable[None]] | None = None,
@@ -402,6 +404,8 @@ async def send_pcm_audio(
         source_label: Label that appears in the orchestrator log line so
             external callers can be traced separately from engine-driven
             synthesis (e.g. ``"voice-tts"``, ``"sfx:notification"``).
+        text: Optional text to send as a sentence_start notification so
+            the device can display subtitles.
         before_first_frame: Internal hook for ``say()`` side effects that
             must be serialized with speech delivery.
 
@@ -500,6 +504,12 @@ async def send_pcm_audio(
                 f"Device disconnected before TTS start notification: {exc}"
             ) from exc
 
+        if text is not None and getattr(gateway.esp32, "send_tts_sentence_start", None):
+            try:
+                await gateway.esp32.send_tts_sentence_start(text)
+            except ConnectionError:
+                pass
+
         # Wait for the firmware's state machine to land in
         # kDeviceStateSpeaking before sending the first frame.
         await asyncio.sleep(TTS_START_TRANSITION_DELAY_S)
@@ -573,6 +583,7 @@ async def send_pcm_stream(
     gateway: "Gateway",
     pcm_chunks: AsyncIterator[bytes],
     *,
+    text: str | None = None,
     source_rate: int = DEVICE_SAMPLE_RATE,
     source_label: str = "stream",
 ) -> dict[str, Any]:
@@ -598,9 +609,8 @@ async def send_pcm_stream(
             byte chunks. Chunk sizes need not be aligned to any boundary;
             the function buffers partial frames internally. Empty chunks
             are skipped without error so producers can use them as a
-            "still alive" heartbeat. Iteration finishing (with no
-            chunks left) flushes any trailing partial frame as
-            zero-padded audio and ends the stream cleanly.
+            keep-alive mechanism.
+        text: Optional text to send as a sentence_start notification.
         source_rate: Sample rate of incoming PCM. Each chunk is
             resampled to :data:`DEVICE_SAMPLE_RATE` independently via
             linear interpolation; boundary discontinuities are
@@ -723,6 +733,12 @@ async def send_pcm_stream(
             raise RuntimeError(
                 f"Device disconnected before TTS start notification: {exc}"
             ) from exc
+
+        if text is not None and getattr(gateway.esp32, "send_tts_sentence_start", None):
+            try:
+                await gateway.esp32.send_tts_sentence_start(text)
+            except ConnectionError:
+                pass
 
         await asyncio.sleep(TTS_START_TRANSITION_DELAY_S)
 

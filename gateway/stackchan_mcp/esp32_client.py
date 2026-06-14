@@ -316,6 +316,21 @@ class ESP32Connection:
         }
         await self._ws_send(json.dumps(message))
 
+    async def send_tts_sentence_start(self, text: str) -> None:
+        """Send a TTS sentence_start notification with the spoken text.
+
+        The firmware displays the text as a subtitle / chat bubble.
+        """
+        if not self._connected:
+            raise ConnectionError("ESP32 not connected")
+        message = {
+            "session_id": self.session_id,
+            "type": "tts",
+            "state": "sentence_start",
+            "text": text,
+        }
+        await self._ws_send(json.dumps(message))
+
     async def send_listen_state(self, state: str, mode: str = "manual") -> None:
         """Send a listen state notification (``start`` / ``stop``).
 
@@ -954,6 +969,15 @@ class ESP32Manager:
         if not self._connection or not self._connection.connected:
             raise ConnectionError("No ESP32 device connected")
         await self._connection.send_tts_state(state)
+
+    async def send_tts_sentence_start(self, text: str) -> None:
+        """Send a TTS sentence_start notification.
+
+        Required so the device can display the spoken text in its UI.
+        """
+        if not self._connection or not self._connection.connected:
+            raise ConnectionError("No ESP32 device connected")
+        await self._connection.send_tts_sentence_start(text)
 
     async def send_listen_state(self, state: str, mode: str = "manual") -> None:
         """Send a listen state notification to put the device into /
