@@ -4247,7 +4247,13 @@ private:
         }
 
         // Initialize original StackChan Avatar using the system font from the active LVGL theme
-        const lv_font_t* font = lv_theme_get_font_small(nullptr);
+        const lv_font_t* font = nullptr;
+        auto lvgl_theme = static_cast<LvglTheme*>(display_->GetTheme());
+        if (lvgl_theme != nullptr && lvgl_theme->text_font() != nullptr) {
+            font = lvgl_theme->text_font()->font();
+        } else {
+            font = lv_theme_get_font_small(nullptr);
+        }
 
         auto avatar = std::make_unique<stackchan::avatar::DefaultAvatar>();
         avatar->init(screen, font);
@@ -4268,6 +4274,11 @@ private:
         if (text == nullptr || text[0] == '\0') {
             stack_chan_.avatar().clearSpeech();
             return;
+        }
+
+        auto lvgl_theme = static_cast<LvglTheme*>(display_->GetTheme());
+        if (lvgl_theme != nullptr && lvgl_theme->text_font() != nullptr) {
+            stack_chan_.avatar().setSpeechTextFont((void*)lvgl_theme->text_font()->font());
         }
 
         stack_chan_.avatar().setSpeech(text);
