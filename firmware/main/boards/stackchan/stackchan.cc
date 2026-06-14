@@ -4286,6 +4286,9 @@ private:
         else if (strcmp(face, "sleepy") == 0) emotion = stackchan::avatar::Emotion::Sleepy;
 
         stack_chan_.avatar().setEmotion(emotion);
+        if (emotion == stackchan::avatar::Emotion::Neutral) {
+            SetMouthShape("closed");
+        }
         current_avatar_face_ = face;
         return true;
     }
@@ -4590,6 +4593,8 @@ private:
 
     void TtsLipSyncStepAdvance() {
         if (!tts_lipsync_active_.load(std::memory_order_acquire)) {
+            // Timer might have fired just as we stopped; ensure mouth is closed.
+            SetMouthShape("closed");
             return;
         }
         if (display_ == nullptr) {
@@ -4623,9 +4628,13 @@ private:
                 break;
         }
         SetMouthShape(shape);
+        
+        // Double check active state before re-arming to avoid race with StopTtsLipSync
         if (tts_lipsync_active_.load(std::memory_order_acquire)) {
             esp_timer_start_once(tts_lipsync_timer_,
                                  (uint64_t)TTS_LIPSYNC_STEP_MS * 1000);
+        } else {
+            SetMouthShape("closed");
         }
     }
 
@@ -4652,6 +4661,7 @@ private:
             // Already active (e.g. duplicate tts.start); nothing to do.
             return;
         }
+        ESP_LOGI(TAG, "TTS lip-sync STARTING");
         // Pause autonomous blink so BlinkStepAdvance()'s
         // RestoreCurrentFaceLocked() does not overwrite the mouth overlay.
         // blink_desired_ remembers the user's intent for restore at stop.
@@ -4670,6 +4680,7 @@ private:
         if (!tts_lipsync_active_.exchange(false, std::memory_order_acq_rel)) {
             return;  // already stopped
         }
+        ESP_LOGI(TAG, "TTS lip-sync STOPPING");
         if (tts_lipsync_timer_ != nullptr) {
             esp_timer_stop(tts_lipsync_timer_);
         }
@@ -4702,7 +4713,7 @@ private:
         if (blink_desired_.load(std::memory_order_acquire)) {
             StartBlinkTimer();
         }
-        ESP_LOGI(TAG, "TTS lip-sync STOPPED");
+        ESP_LOGI(TAG, "TTS lip-sync STOPPED and mouth CLOSED");
     }
 
     // ---- Phase 2: lip-sync sequence playback (Issue #5) ----------------
