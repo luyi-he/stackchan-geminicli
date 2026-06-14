@@ -59,7 +59,7 @@ DefaultSpeechBubble::DefaultSpeechBubble(lv_obj_t* parent, lv_color_t primaryCol
     _text->setAlign(LV_ALIGN_CENTER);
     _text->setPos(0, 0);
     _text->setWidth(320 - _text_mx * 2);
-    _text->setLongMode(LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+    _text->setLongMode(LV_LABEL_LONG_MODE_WRAP);
 
     clearSpeech();
 }
