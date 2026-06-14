@@ -9,13 +9,13 @@ using namespace uitk;
 using namespace uitk::lvgl_cpp;
 using namespace stackchan::avatar;
 
-static const Vector2i _mouth_pos        = Vector2i(0, 15);
+static const Vector2i _mouth_pos        = Vector2i(0, 20);
 static const Vector2i _mouth_min_offset = Vector2i(-16, -16);
 static const Vector2i _mouth_max_offset = Vector2i(16, 16);
-static const Vector2i _mouth_min_size   = Vector2i(90, 6);
-static const Vector2i _mouth_max_size   = Vector2i(60, 50);
+static const Vector2i _mouth_min_size   = Vector2i(100, 8);
+static const Vector2i _mouth_max_size   = Vector2i(80, 60);
 static const int _mouth_min_radius      = 0;
-static const int _mouth_max_radius      = 16;
+static const int _mouth_max_radius      = 20;
 
 DefaultMouth::DefaultMouth(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor)
 {

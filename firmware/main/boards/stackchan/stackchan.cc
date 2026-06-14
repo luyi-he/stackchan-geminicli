@@ -4240,27 +4240,15 @@ private:
 
         if (stack_chan_.hasAvatar()) {
             // If the active screen has changed, move the avatar to the new screen
-            lv_obj_t* panel = stack_chan_.avatar().getPanel()->get();
-            if (lv_obj_get_parent(panel) != screen) {
+            lv_obj_t* panel = static_cast<lv_obj_t*>(stack_chan_.avatar().getPanel());
+            if (panel != nullptr && lv_obj_get_parent(panel) != screen) {
                 lv_obj_set_parent(panel, screen);
-                // The speech bubble is part of the original avatar class now, 
-                // but we might still need to handle it if we used our custom one.
-                // Original DefaultAvatar already has its own speech bubble!
             }
             return true;
         }
 
-        // Initialize original StackChan Avatar using the system font from the theme
-        const lv_font_t* font = nullptr;
-        if (display_ != nullptr) {
-            Theme* base_theme = display_->GetTheme();
-            if (base_theme != nullptr) {
-                LvglTheme* theme = static_cast<LvglTheme*>(base_theme);
-                if (theme->text_font() != nullptr) {
-                    font = theme->text_font()->font();
-                }
-            }
-        }
+        // Initialize original StackChan Avatar using the system font from the active LVGL theme
+        const lv_font_t* font = lv_theme_get_font_main(nullptr);
 
         auto avatar = std::make_unique<stackchan::avatar::DefaultAvatar>();
         avatar->init(screen, font);
@@ -4279,11 +4267,11 @@ private:
         DisplayLockGuard lock(display_);
 
         if (text == nullptr || text[0] == '\0') {
-            stack_chan_.avatar().getSpeechBubble()->clearSpeech();
+            stack_chan_.avatar().clearSpeech();
             return;
         }
 
-        stack_chan_.avatar().getSpeechBubble()->setSpeech(text);
+        stack_chan_.avatar().setSpeech(text);
     }
 
     // Apply the requested face to avatar_img_. Returns false if the face is

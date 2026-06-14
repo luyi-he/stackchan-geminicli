@@ -23,7 +23,7 @@ public:
     lv_color_t secondaryColor = lv_color_white();
 
     void init(lv_obj_t* parent, const lv_font_t* font = nullptr);
-    uitk::lvgl_cpp::Container* getPanel() const;
+    void* getPanel() override;
 
 private:
     std::unique_ptr<uitk::lvgl_cpp::Container> _pannel;

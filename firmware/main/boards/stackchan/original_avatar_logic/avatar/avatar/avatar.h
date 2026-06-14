@@ -107,6 +107,11 @@ public:
         return _is_modify_locked;
     }
 
+    virtual void* getPanel()
+    {
+        return nullptr;
+    }
+
     /* ---------------------------- Decorator helpers --------------------------- */
 
     int addDecorator(std::unique_ptr<Decorator> decorator)

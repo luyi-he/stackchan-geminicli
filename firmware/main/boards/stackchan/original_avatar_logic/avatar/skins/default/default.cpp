@@ -25,10 +25,10 @@ void DefaultAvatar::init(lv_obj_t* parent, const lv_font_t* font)
         std::make_unique<DefaultSpeechBubble>(_pannel->get(), primaryColor, secondaryColor, font);
 }
 
-Container* DefaultAvatar::getPanel() const
+void* DefaultAvatar::getPanel()
 {
     if (_pannel) {
-        return _pannel.get();
+        return (void*)_pannel->get();
     }
     return NULL;
 }
