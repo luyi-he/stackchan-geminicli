@@ -4112,8 +4112,12 @@ private:
     // avatar lv_obj cannot be created yet because the screen tree isn't up).
     bool RenderAvatarLocked() {
         if (!EnsureAvatarObject()) return false;
-        UpdateVectorFace(current_avatar_face_.c_str());
-        lv_obj_move_foreground(face_cont_);
+        if (stack_chan_.hasAvatar()) {
+            lv_obj_t* panel = static_cast<lv_obj_t*>(stack_chan_.avatar().getPanel());
+            if (panel != nullptr) {
+                lv_obj_move_foreground(panel);
+            }
+        }
         if (speech_bubble_cont_) {
             lv_obj_move_foreground(speech_bubble_cont_);
         }
@@ -4248,7 +4252,7 @@ private:
         }
 
         // Initialize original StackChan Avatar using the system font from the active LVGL theme
-        const lv_font_t* font = lv_theme_get_font_main(nullptr);
+        const lv_font_t* font = lv_theme_get_font_small(nullptr);
 
         auto avatar = std::make_unique<stackchan::avatar::DefaultAvatar>();
         avatar->init(screen, font);
@@ -4312,10 +4316,13 @@ private:
         bool ok;
         {
             DisplayLockGuard lock(display_);
-            if (face_cont_ != nullptr) {
+            if (stack_chan_.hasAvatar()) {
                 // Restore visibility if a previous SetAvatarOff() hid the
                 // layer. Cheap no-op when the flag is already clear.
-                lv_obj_clear_flag(face_cont_, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_t* panel = static_cast<lv_obj_t*>(stack_chan_.avatar().getPanel());
+                if (panel != nullptr) {
+                    lv_obj_clear_flag(panel, LV_OBJ_FLAG_HIDDEN);
+                }
             }
             ok = SetAvatarExpressionLocked(face);
         }
@@ -4359,8 +4366,11 @@ private:
         StopBlinkTimer();
         {
             DisplayLockGuard lock(display_);
-            if (face_cont_ != nullptr) {
-                lv_obj_add_flag(face_cont_, LV_OBJ_FLAG_HIDDEN);
+            if (stack_chan_.hasAvatar()) {
+                lv_obj_t* panel = static_cast<lv_obj_t*>(stack_chan_.avatar().getPanel());
+                if (panel != nullptr) {
+                    lv_obj_add_flag(panel, LV_OBJ_FLAG_HIDDEN);
+                }
             }
         }
         current_avatar_face_ = "off";
@@ -4446,8 +4456,7 @@ private:
     // mouth call will replace in layered mode.
     bool RestoreCurrentFaceLocked() {
         if (!EnsureAvatarObject()) return false;
-        UpdateVectorFace(current_avatar_face_.c_str());
-        return true;
+        return SetAvatarExpressionLocked(current_avatar_face_.c_str());
     }
 
     // Public mouth setter: wraps lock + look-up.
@@ -4462,7 +4471,7 @@ private:
         else if (strcmp(shape, "e") == 0) weight = 30;
         else if (strcmp(shape, "u") == 0) weight = 60;
 
-        stack_chan_.avatar().getMouth()->setWeight(weight);
+        stack_chan_.avatar().mouth().setWeight(weight);
         return true;
     }
 
