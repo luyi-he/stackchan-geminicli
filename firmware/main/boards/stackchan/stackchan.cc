@@ -6524,9 +6524,8 @@ public:
         InitializeServo();
         InitializeSi12tTouch();
         I2cDetect();
-        // Avatar auto-display disabled: WiFi config UI needs to be visible.
-        // Avatar is shown on-demand via MCP set_avatar command.
-        // InitializeAvatar();
+        // Avatar auto-display enabled: show Stack-chan face once UI is ready.
+        InitializeAvatar();
         InitializeMouthSequenceTask();
         xTaskCreate(&StackChanBoard::AvatarTaskTrampoline, "avatar_update", 4096, this, tskIDLE_PRIORITY + 1, nullptr);
         RegisterMcpTools();
