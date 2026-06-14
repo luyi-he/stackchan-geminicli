@@ -536,7 +536,6 @@ private:
     // by Application::Start() -> Display::SetupUI(), which runs after this
     // board's constructor completes. avatar_init_timer_ retries every 500 ms
     // until the screen is ready, then stops itself.
-    lv_obj_t* avatar_img_ = nullptr; // Keep for compatibility if needed
     lv_obj_t* face_cont_ = nullptr;
     lv_obj_t* eye_l_ = nullptr;
     lv_obj_t* eye_r_ = nullptr;
@@ -4111,29 +4110,12 @@ private:
     // loaded in matrix mode but the index triple is out of range, or the
     // avatar lv_obj cannot be created yet because the screen tree isn't up).
     bool RenderAvatarLocked() {
-        const lv_image_dsc_t* dsc = nullptr;
-        if (avatar_set_.is_loaded() &&
-            avatar_set_.mode() == AvatarSet::Mode::kMatrix) {
-            dsc = avatar_set_.GetMatrix(current_face_index_,
-                                        current_eyes_index_,
-                                        current_mouth_index_);
-        } else {
-            switch (active_layer_) {
-                case ActiveLayer::FACE:
-                    dsc = FaceImageForIndex(current_face_index_);
-                    break;
-                case ActiveLayer::EYES:
-                    dsc = EyesImageForIndex(current_eyes_index_);
-                    break;
-                case ActiveLayer::MOUTH:
-                    dsc = MouthImageForIndex(current_mouth_index_);
-                    break;
-            }
-        }
-        if (dsc == nullptr) return false;
         if (!EnsureAvatarObject()) return false;
-        lv_image_set_src(avatar_img_, dsc);
-        lv_obj_move_foreground(avatar_img_);
+        UpdateVectorFace(current_avatar_face_.c_str());
+        lv_obj_move_foreground(face_cont_);
+        if (speech_bubble_cont_) {
+            lv_obj_move_foreground(speech_bubble_cont_);
+        }
         return true;
     }
 
@@ -4250,12 +4232,20 @@ private:
     // Caller must hold the LVGL/display lock. Returns true on success or
     // when avatar_img_ already exists.
     bool EnsureAvatarObject() {
-        if (face_cont_ != nullptr) {
-            return true;
-        }
         lv_obj_t* screen = lv_screen_active();
         if (screen == nullptr) {
             return false;
+        }
+
+        if (face_cont_ != nullptr) {
+            // If the active screen has changed, move the avatar to the new screen
+            if (lv_obj_get_parent(face_cont_) != screen) {
+                lv_obj_set_parent(face_cont_, screen);
+                if (speech_bubble_cont_) {
+                    lv_obj_set_parent(speech_bubble_cont_, screen);
+                }
+            }
+            return true;
         }
 
         // Create main face container (Original background color is often white or off-white)
@@ -4407,10 +4397,10 @@ private:
         bool ok;
         {
             DisplayLockGuard lock(display_);
-            if (avatar_img_ != nullptr) {
+            if (face_cont_ != nullptr) {
                 // Restore visibility if a previous SetAvatarOff() hid the
                 // layer. Cheap no-op when the flag is already clear.
-                lv_obj_clear_flag(avatar_img_, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_clear_flag(face_cont_, LV_OBJ_FLAG_HIDDEN);
             }
             ok = SetAvatarExpressionLocked(face);
         }
@@ -4454,8 +4444,8 @@ private:
         StopBlinkTimer();
         {
             DisplayLockGuard lock(display_);
-            if (avatar_img_ != nullptr) {
-                lv_obj_add_flag(avatar_img_, LV_OBJ_FLAG_HIDDEN);
+            if (face_cont_ != nullptr) {
+                lv_obj_add_flag(face_cont_, LV_OBJ_FLAG_HIDDEN);
             }
         }
         current_avatar_face_ = "off";
@@ -4484,10 +4474,15 @@ private:
         esp_timer_create_args_t timer_args = {
             .callback = [](void* arg) {
                 StackChanBoard* board = static_cast<StackChanBoard*>(arg);
+                // Keep calling SetAvatarExpression to ensure it's created and moved to foreground
                 if (board->SetAvatarExpression("idle")) {
-                    ESP_LOGI(TAG, "Initial avatar (idle) installed");
-                    if (board->avatar_init_timer_ != nullptr) {
-                        esp_timer_stop(board->avatar_init_timer_);
+                    // Even after success, we check a few more times to handle screen switches during boot
+                    static int success_count = 0;
+                    if (++success_count > 10) {
+                        ESP_LOGI(TAG, "Initial avatar (idle) permanently installed");
+                        if (board->avatar_init_timer_ != nullptr) {
+                            esp_timer_stop(board->avatar_init_timer_);
+                        }
                     }
                 }
             },
@@ -4499,7 +4494,7 @@ private:
         ESP_ERROR_CHECK(esp_timer_create(&timer_args, &avatar_init_timer_));
         // Retry every 500 ms; SetupUI() typically completes within a few
         // hundred ms after Application::Start(). Once installed the callback
-        // stops the timer.
+        // stops the timer after a few confirmations.
         ESP_ERROR_CHECK(esp_timer_start_periodic(avatar_init_timer_, 500 * 1000));
     }
 
