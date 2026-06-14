@@ -52,6 +52,8 @@ static inline bool ServoWritePosOk(int r) { return r > 0; }
 #include "avatar/skins/default/default.h"
 #include "modifiers/blink.h"
 #include "modifiers/breath.h"
+#include "display/lvgl_display/lvgl_theme.h"
+#include "display/lvgl_display/lvgl_font.h"
 
 #include <lvgl.h>
 #include <algorithm>
@@ -4248,9 +4250,20 @@ private:
             return true;
         }
 
-        // Initialize original StackChan Avatar
+        // Initialize original StackChan Avatar using the system font from the theme
+        const lv_font_t* font = nullptr;
+        if (display_ != nullptr) {
+            Theme* base_theme = display_->GetTheme();
+            if (base_theme != nullptr) {
+                LvglTheme* theme = static_cast<LvglTheme*>(base_theme);
+                if (theme->text_font() != nullptr) {
+                    font = theme->text_font()->font();
+                }
+            }
+        }
+
         auto avatar = std::make_unique<stackchan::avatar::DefaultAvatar>();
-        avatar->init(screen, nullptr);
+        avatar->init(screen, font);
         stack_chan_.attachAvatar(std::move(avatar));
 
         // Add standard modifiers (Blink, Breath)
