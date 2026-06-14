@@ -17,12 +17,23 @@ namespace app_center {
     };
 }
 
+enum class HeadPetGesture { None, Press, Release, SwipeForward, SwipeBackward };
+enum class ImuMotionEvent { None = 0, Shake, PickUp };
+
 class Hal {
 public:
     void delay(std::uint32_t ms);
     std::uint32_t millis();
     void lvglLock() {}
     void lvglUnlock() {}
+
+    // Missing RGB methods
+    void setRgbColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {}
+    void refreshRgb() {}
+
+    // Missing Signals
+    uitk::Signal<HeadPetGesture> onHeadPetGesture;
+    uitk::Signal<ImuMotionEvent> onImuMotionEvent;
 };
 
 Hal& GetHAL();

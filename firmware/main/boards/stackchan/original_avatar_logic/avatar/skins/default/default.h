@@ -21,7 +21,7 @@ public:
     lv_color_t primaryColor   = lv_color_black();
     lv_color_t secondaryColor = lv_color_white();
 
-    void init(lv_obj_t* parent, const lv_font_t* font = &lv_font_montserrat_16);
+    void init(lv_obj_t* parent, const lv_font_t* font = &lv_font_montserrat_14);
     uitk::lvgl_cpp::Container* getPanel() const;
 
 private:
