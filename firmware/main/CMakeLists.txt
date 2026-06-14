@@ -42,6 +42,7 @@ set(SOURCES "audio/audio_codec.cc"
 
 set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "audio/demuxer" "protocols"
                 "boards/stackchan/original_avatar_logic"
+                "boards/stackchan/original_avatar_logic/hal"
                 "boards/stackchan/original_avatar_logic/avatar"
                 "boards/stackchan/original_avatar_logic/avatar/avatar"
                 "boards/stackchan/original_avatar_logic/avatar/skins/default")

@@ -134,6 +134,7 @@ dependencies:
     version: ^0.3.1
     rules:
     - if: target in [esp32s3, esp32p4]
+  bblanchon/ArduinoJson: ^7.1.0
 
   ## Required IDF version
   idf:
