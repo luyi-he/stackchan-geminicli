@@ -65,8 +65,6 @@ static inline bool ServoWritePosOk(int r) { return r > 0; }
 
 #define TAG "StackChanBoard"
 
-LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
-
 class Pmic : public Axp2101 {
 public:
     // Power Init
@@ -4252,7 +4250,7 @@ private:
 
         // Initialize original StackChan Avatar
         auto avatar = std::make_unique<stackchan::avatar::DefaultAvatar>();
-        avatar->init(screen, &BUILTIN_TEXT_FONT);
+        avatar->init(screen, nullptr);
         stack_chan_.attachAvatar(std::move(avatar));
 
         // Add standard modifiers (Blink, Breath)

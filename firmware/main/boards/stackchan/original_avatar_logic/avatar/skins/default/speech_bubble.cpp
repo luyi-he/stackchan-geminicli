@@ -52,7 +52,9 @@ DefaultSpeechBubble::DefaultSpeechBubble(lv_obj_t* parent, lv_color_t primaryCol
 
     _text = std::make_unique<Label>(_bubble->get());
     _text->setTextColor(secondaryColor);
-    _text->setTextFont(font);
+    if (font) {
+        _text->setTextFont(font);
+    }
     _text->setTextAlign(LV_TEXT_ALIGN_CENTER);
     _text->setAlign(LV_ALIGN_CENTER);
     _text->setPos(0, 0);
@@ -110,6 +112,6 @@ void DefaultSpeechBubble::setVisible(bool visible)
 void DefaultSpeechBubble::setTextFont(void* font)
 {
     if (_text && font) {
-        _text->setTextFont((lv_font_t*)font);
+        _text->setTextFont((const lv_font_t*)font);
     }
 }
