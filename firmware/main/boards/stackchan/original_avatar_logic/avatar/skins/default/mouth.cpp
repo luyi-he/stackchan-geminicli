@@ -9,7 +9,7 @@ using namespace uitk;
 using namespace uitk::lvgl_cpp;
 using namespace stackchan::avatar;
 
-static const Vector2i _mouth_pos        = Vector2i(0, 26);
+static const Vector2i _mouth_pos        = Vector2i(0, 15);
 static const Vector2i _mouth_min_offset = Vector2i(-16, -16);
 static const Vector2i _mouth_max_offset = Vector2i(16, 16);
 static const Vector2i _mouth_min_size   = Vector2i(90, 6);

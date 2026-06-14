@@ -10,7 +10,7 @@ using namespace uitk::lvgl_cpp;
 using namespace stackchan::avatar;
 
 static const int _eye_size            = 16;
-static const Vector2i _eye_pos        = Vector2i(-70, -16);
+static const Vector2i _eye_pos        = Vector2i(-70, -10);
 static const Vector2i _eye_min_offset = Vector2i(-16, -16);
 static const Vector2i _eye_max_offset = Vector2i(16, 16);
 static const Vector2i _eye_size_limit = Vector2i(8, 32);
