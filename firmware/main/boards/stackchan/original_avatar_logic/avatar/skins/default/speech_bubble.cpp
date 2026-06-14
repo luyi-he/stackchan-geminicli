@@ -9,14 +9,14 @@ using namespace uitk;
 using namespace uitk::lvgl_cpp;
 using namespace stackchan::avatar;
 
-static const Vector2i _container_pos  = Vector2i(0, 89);
-static const Vector2i _container_size = Vector2i(320, 74);
+static const Vector2i _container_pos  = Vector2i(0, 105);
+static const Vector2i _container_size = Vector2i(320, 30);
 static const Vector2i _arrow_offset   = Vector2i(40, -15);
-static const int _text_mx             = 20;
-static const int _bubble_min_width    = 90;
-static const int _bubble_max_width    = 340;
-static const int _bubble_height       = 52;
-static const int _bubble_min_offset_x = 66;
+static const int _text_mx             = 10;
+static const int _bubble_min_width    = 320;
+static const int _bubble_max_width    = 320;
+static const int _bubble_height       = 30;
+static const int _bubble_min_offset_x = 0;
 static const int _bubble_max_offset_x = 0;
 
 LV_IMAGE_DECLARE(default_bubble_arrow);
@@ -34,21 +34,24 @@ DefaultSpeechBubble::DefaultSpeechBubble(lv_obj_t* parent, lv_color_t primaryCol
     _container->setPos(_container_pos.x, _container_pos.y);
     _container->setPadding(0, 0, 0, 0);
 
+    // Hide arrow for bottom bar style
     _arrow = std::make_unique<Image>(_container->get());
     _arrow->setSrc(&default_bubble_arrow);
     _arrow->setAlign(LV_ALIGN_CENTER);
     _arrow->setPos(_arrow_offset.x, _arrow_offset.y);
     _arrow->setImageRecolorOpa(LV_OPA_COVER);
     _arrow->setImageRecolor(primaryColor);
+    _arrow->setHidden(true);
 
     _bubble = std::make_unique<Container>(_container->get());
-    _bubble->setRadius(LV_RADIUS_CIRCLE);
+    _bubble->setRadius(0);
     _bubble->setAlign(LV_ALIGN_CENTER);
     _bubble->setBorderWidth(0);
     _bubble->setBgColor(primaryColor);
+    _bubble->setBgOpa(LV_OPA_60); // Semi-transparent
     _bubble->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
     _bubble->setSize(_bubble_max_width, _bubble_height);
-    _bubble->setPos(0, 11);
+    _bubble->setPos(0, 0);
 
     _text = std::make_unique<Label>(_bubble->get());
     _text->setTextColor(secondaryColor);
@@ -59,7 +62,7 @@ DefaultSpeechBubble::DefaultSpeechBubble(lv_obj_t* parent, lv_color_t primaryCol
     _text->setAlign(LV_ALIGN_CENTER);
     _text->setPos(0, 0);
     _text->setWidth(320 - _text_mx * 2);
-    _text->setLongMode(LV_LABEL_LONG_MODE_WRAP);
+    _text->setLongMode(LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
     clearSpeech();
 }

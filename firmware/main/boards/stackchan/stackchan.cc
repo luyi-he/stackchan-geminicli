@@ -543,8 +543,6 @@ private:
     // until the screen is ready, then stops itself.
     // ---- Original StackChan Logic Integration ----
     stackchan::StackChan stack_chan_;
-    lv_obj_t* speech_bubble_cont_ = nullptr; // keep for text updates
-    lv_obj_t* speech_bubble_label_ = nullptr; // keep for text updates
 
     esp_timer_handle_t avatar_init_timer_ = nullptr;
     std::string current_avatar_face_ = "idle";
@@ -4117,9 +4115,6 @@ private:
             if (panel != nullptr) {
                 lv_obj_move_foreground(panel);
             }
-        }
-        if (speech_bubble_cont_) {
-            lv_obj_move_foreground(speech_bubble_cont_);
         }
         return true;
     }
