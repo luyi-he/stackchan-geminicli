@@ -4252,7 +4252,7 @@ private:
 
         // Initialize original StackChan Avatar
         auto avatar = std::make_unique<stackchan::avatar::DefaultAvatar>();
-        avatar->init(screen);
+        avatar->init(screen, &BUILTIN_TEXT_FONT);
         stack_chan_.attachAvatar(std::move(avatar));
 
         // Add standard modifiers (Blink, Breath)
